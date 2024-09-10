@@ -1,4 +1,4 @@
-# Crypto_SentimentNews
+# Crypto News Insights
 
 
 
