@@ -10,29 +10,23 @@ import re
 from secret import secrets
 import praw 
 from GoogleNews import GoogleNews
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from textblob import TextBlob
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
-## ENVIORNMENT DATE VARIABLES
-current_date = datetime.now().strftime("%m_%d_%Y_%H")
-current_date_sys = datetime.now()
 
-### RSS NEWS SOURCES:
-rss_urls = [
-    "https://cointelegraph.com/rss",
-    "https://bitcoinmagazine.com/.rss/full/",
-    "https://bitcoinist.com/feed/",
-    "https://www.newsbtc.com/feed/",
-    "https://cryptopotato.com/feed/",
-    "https://99bitcoins.com/feed/",
-    "https://cryptobriefing.com/feed/",
-    "https://www.coinbackyard.com/feed/",
-    "https://stratus.io/blog/feed/"
-]
-
-# INITIALIZE THE DATAFRAME
-main_frame = pd.DataFrame()
 
 '''
+---------------------------------------------
 ----- DEFINING ALL NEWS PULL FUNCTIONS ------
+---------------------------------------------
 '''
 
 ## 1. RSS FEED FUNCTION
@@ -148,6 +142,27 @@ def fetch_top_reddit_posts(client_id, client_secret, user_agent, subreddits, lim
 ----- RUNNING THE FUNCTIONS -----
 '''
 
+## ENVIORNMENT DATE VARIABLES
+current_date = datetime.now().strftime("%m_%d_%Y_%H")
+current_date_sys = datetime.now()
+
+### RSS NEWS SOURCES:
+rss_urls = [
+    "https://cointelegraph.com/rss",
+    "https://bitcoinmagazine.com/.rss/full/",
+    "https://bitcoinist.com/feed/",
+    "https://www.newsbtc.com/feed/",
+    "https://cryptopotato.com/feed/",
+    "https://99bitcoins.com/feed/",
+    "https://cryptobriefing.com/feed/",
+    "https://www.coinbackyard.com/feed/",
+    "https://stratus.io/blog/feed/"
+]
+
+# INITIALIZE THE DATAFRAME
+main_frame = pd.DataFrame()
+
+
 ## 1. RSS DATA
 for rss_url in rss_urls:
     df = rss_to_dataframe(rss_url)
@@ -187,11 +202,7 @@ total_raw_data.to_csv(f'Data/Raw_Data/Newsfeed_{current_date}.csv', index=False)
 Starting Text Pre Processing 
 '''
 
-import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
+
 
 # Download necessary NLTK data files
 nltk.download('punkt')
@@ -222,6 +233,8 @@ def preprocess_text(text):
 
 ### STARTING TEXT PRE-PROCESSING
 print('Starting Text Pre-Processing...')
+
+# Make a 
 total_raw_data['Total Text'] = total_raw_data.Title.fillna('') + '' + total_raw_data.Description.fillna('')
 total_raw_data['Pre-Processed Text'] = total_raw_data['Total Text'].apply(preprocess_text)
 total_raw_data = total_raw_data[['MainSource', 'Source', 'Publication Date', 'Pull_date', 'Pre-Processed Text']]
@@ -230,46 +243,81 @@ total_raw_data = total_raw_data[['MainSource', 'Source', 'Publication Date', 'Pu
 '''
 DOING SENTIMENT ANALYSIS
 '''
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from textblob import TextBlob
 
-# Initialize the VADER sentiment analyzer
+# STEP 1: INITALIZE VADER VARIABLE
 analyzer = SentimentIntensityAnalyzer()
 
-# Apply VADER sentiment analysis
+# STEP 2: APPLY VADER SENTIMENT ON PRE-PROCESSED TEXT
 total_raw_data['Sentiment_Vader'] = total_raw_data['Pre-Processed Text'].apply(lambda x: analyzer.polarity_scores(x)['compound'])
-total_raw_data['Sentiment_TextBlob'] = total_raw_data['Pre-Processed Text'].apply(lambda x: TextBlob(x).sentiment.polarity)
-total_raw_data['Average_Sentiment'] = (total_raw_data['Sentiment_Vader']+total_raw_data['Sentiment_TextBlob'])/2
 
+#STEP 3: APPLY TEXTBLOB ON PRE-PROCESSED TEXT
+total_raw_data['Sentiment_TextBlob'] = total_raw_data['Pre-Processed Text'].apply(lambda x: TextBlob(x).sentiment.polarity)
+
+# STEP 4: GET THE AVERAGE SENTIMENT VARIABLE
+total_raw_data['Average_Sentiment'] = (total_raw_data['Sentiment_Vader']+total_raw_data['Sentiment_TextBlob'])/2
+total_raw_data.to_csv(f'Data/Processed_Data/Newsfeed_Processed_{current_date}.csv', index=False)
+
+# STEP 5: PRINT OUT FINDINGS
 print(f"Vader Sentiment Average: {total_raw_data['Sentiment_Vader'].mean()}")
 print(f"Vader TextBlob Average: {total_raw_data['Sentiment_TextBlob'].mean()}")
 print(f"Total Average: {total_raw_data['Average_Sentiment'].mean()}")
 
+# STEP 6: GROUP SENTIMENT BY DAY TO GET TOTAL AVERAGE SENTIMENT FROM DATA PULL
 sent = total_raw_data[['Pull_date', 'Sentiment_Vader', 'Sentiment_TextBlob', 'Average_Sentiment']]
-sent = sent.groupby(['Pull_date']).mean()
+sent = sent.groupby(['Pull_date']).mean().reset_index(drop=False)
 
-#Load main sentiment df
+# STEP 7: LOAD HISTORIC SENTIMENT VALUES TO ADD TO DATAFRAME
 sentiment = pd.read_csv('Data/Processed_Data/Sentiment_Values/Sentiment.csv')
 sentiment = pd.concat([sentiment, sent], ignore_index=True)
-
-# Date values
-# Ensure 'Pull_date' is in datetime format for sorting
 sentiment['Pull_date'] = pd.to_datetime(sentiment['Pull_date'])
-
-# Sort by 'Pull_date' to ensure data is sequential
 sentiment = sentiment.sort_values(by='Pull_date')
+sentiment = sentiment[['Pull_date','Sentiment_Vader','Sentiment_TextBlob','Average_Sentiment']]
 sentiment.to_csv('Data/Processed_Data/Sentiment_Values/Sentiment.csv')
-# Get the last two sentiment scores for comparison
+
+# STEP 8: FIND PERCENTAGE DIFFERENCE FROM LAST PULL
 last_two_scores = sentiment['Average_Sentiment'].iloc[-2:]
-
-# Calculate percentage difference between the last and second last entry
 percentage_diff = last_two_scores.pct_change().iloc[-1] * 100
-
-# Print the percentage difference
 print(f"Percentage difference in sentiment score between the new day and the previous day: {percentage_diff:.2f}%")
 
 
+'''
+STARTING WORDCLOUD AND OUTPUTS
+'''
 
-total_raw_data.to_csv(f'Data/Processed_Data/Newsfeed_Processed_{current_date}.csv', index=False)
+total_raw_data = pd.read_csv('Data/Processed_Data/Newsfeed_Processed_09_10_2024_21.csv')
+total_raw_data['Pre-Processed Text'] = total_raw_data['Pre-Processed Text'] .fillna('')
+# STEP 1: DEFINE FUNCTIONS
+def tf_idf(text, ngram_range=(2, 2), exclude_words = None):
+    if exclude_words is None:
+        exclude_words = []
+    vectorizer = TfidfVectorizer(stop_words=exclude_words, ngram_range=ngram_range)
+    tfidf_matrix = vectorizer.fit_transform(text)
+    tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
+    term_importance = tfidf_df.sum().sort_values(ascending=False)
+    return term_importance
+
+def word_cloud(text, title, type, top=65, dpi=210):
+    top_n_terms = text.head(top)
+    wordcloud = WordCloud(width=800, height=400, background_color='black').generate_from_frequencies(top_n_terms)
+    fig = plt.figure(figsize=(10, 5), dpi = dpi)
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title(title, fontsize=20, fontweight='bold', backgroundcolor='White', color='black', pad=20)
+    fig.savefig(f'Data/Processed_Data/Graphic_Output/{type}WC{current_date}.png', transparent=True)
+    
+
+
+# STEP 2: MAKE FOR FULL DATAFRAME
+FullText = total_raw_data['Pre-Processed Text']
+FullText = tf_idf(FullText)
+word_cloud(FullText, 'All Text Wordcloud', 'AllText')
+
+PositiveSentiment = total_raw_data[total_raw_data["Average_Sentiment"] > 0.5]['Pre-Processed Text']
+PositiveSentiment = tf_idf(PositiveSentiment)
+word_cloud(PositiveSentiment, 'Positive News Articles Only', 'Positive')
+
+NegativeSentiment = total_raw_data[total_raw_data["Average_Sentiment"] < -0.5]['Pre-Processed Text']
+NegativeSentiment = tf_idf(NegativeSentiment)
+word_cloud(NegativeSentiment, 'Negative News Articles Only', 'Negative')
 
 print('HurayyY! News data pull is done!')
