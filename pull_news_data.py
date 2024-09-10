@@ -245,6 +245,31 @@ print(f"Vader Sentiment Average: {total_raw_data['Sentiment_Vader'].mean()}")
 print(f"Vader TextBlob Average: {total_raw_data['Sentiment_TextBlob'].mean()}")
 print(f"Total Average: {total_raw_data['Average_Sentiment'].mean()}")
 
+sent = total_raw_data[['Pull_date', 'Sentiment_Vader', 'Sentiment_TextBlob', 'Average_Sentiment']]
+sent = sent.groupby(['Pull_date']).mean()
+
+#Load main sentiment df
+sentiment = pd.read_csv('Data/Processed_Data/Sentiment_Values/Sentiment.csv')
+sentiment = pd.concat([sentiment, sent], ignore_index=True)
+
+# Date values
+# Ensure 'Pull_date' is in datetime format for sorting
+sentiment['Pull_date'] = pd.to_datetime(sentiment['Pull_date'])
+
+# Sort by 'Pull_date' to ensure data is sequential
+sentiment = sentiment.sort_values(by='Pull_date')
+sentiment.to_csv('Data/Processed_Data/Sentiment_Values/Sentiment.csv')
+# Get the last two sentiment scores for comparison
+last_two_scores = sentiment['Average_Sentiment'].iloc[-2:]
+
+# Calculate percentage difference between the last and second last entry
+percentage_diff = last_two_scores.pct_change().iloc[-1] * 100
+
+# Print the percentage difference
+print(f"Percentage difference in sentiment score between the new day and the previous day: {percentage_diff:.2f}%")
+
+
+
 total_raw_data.to_csv(f'Data/Processed_Data/Newsfeed_Processed_{current_date}.csv', index=False)
 
 print('HurayyY! News data pull is done!')
