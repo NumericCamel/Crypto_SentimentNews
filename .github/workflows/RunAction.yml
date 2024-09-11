@@ -1,0 +1,30 @@
+name: Twice Daily Workflow
+
+on:
+  schedule:
+    # Run at 00:00 UTC and 12:00 UTC every day
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
+    
+    # Add this to allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  run_script:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Run your script with secrets
+      - name: Run script using secrets
+        env:
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+        run: |
+          echo "Running the script at $(date)"
+          python pull_news_data.py
