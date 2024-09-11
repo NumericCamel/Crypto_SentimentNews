@@ -20,8 +20,12 @@ from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import os 
 
-
+client_id = os.getenv("CLIENT_ID")
+client_secret = os.getenv("CLIENT_SECRET")
+user_agent = os.getenv("USERNAME")
+password = os.getenv("PASSWORD")
 
 '''
 ---------------------------------------------
@@ -180,11 +184,6 @@ print(f'Google News Data Pull Successful, a total of {len(news_df)} articles wer
 
 
 ## 3. REDDIT DATA
-client_id=secrets['client_id'],
-client_secret=secrets['client_secret'],
-user_agent='CamelQuant'
-subreddits = ["solana", "ethereum", "bitcoin", "news", "CryptoCurrency", "crypto", "finance","Satoshistreetbets","Ripple"]
-
 print('Starting Reddit Pull...')
 posts = fetch_top_reddit_posts(client_id, client_secret, user_agent, subreddits)
 print(f'A total of {len(posts)} posts were pulled')
