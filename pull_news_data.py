@@ -184,6 +184,7 @@ print(f'Google News Data Pull Successful, a total of {len(news_df)} articles wer
 
 
 ## 3. REDDIT DATA
+subreddits = ["solana", "ethereum", "bitcoin", "news", "CryptoCurrency", "crypto", "finance"]
 print('Starting Reddit Pull...')
 posts = fetch_top_reddit_posts(client_id, client_secret, user_agent, subreddits)
 print(f'A total of {len(posts)} posts were pulled')
